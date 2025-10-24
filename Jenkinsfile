@@ -46,8 +46,8 @@ pipeline {
                 script {
                     sh '''
                     aws eks update-kubeconfig --name arcluster --region $AWS_REGION
-                    sed -i "s|<ECR_REPO_URI>|$ECR_REPO|g" deployment.yaml
-                    kubectl apply -f deployment.yaml
+                    sed -i "s|<ECR_REPO_URI>|$ECR_REPO|g" Deployment.yaml
+                    kubectl apply -f Deployment.yaml
                     '''
                 }
             }
