@@ -45,7 +45,7 @@ pipeline {
             steps {
                 script {
                     sh '''
-                    aws eks update-kubeconfig --name ar_clusterm --region $AWS_REGION
+                    aws eks update-kubeconfig --name ar_cluster --region $AWS_REGION
                     kubectl apply -f Deployment.yaml
                     '''
                 }
