@@ -57,7 +57,7 @@ jobs:
       # --- EKS Deployment ---
       - name: 6. Update Kubeconfig for EKS
         # The temporary credentials from OIDC are used to configure kubectl
-        uses: aws-actions/amazon-eks-configure-kubeconfig@v3
+        uses: aws-actions/amazon-eks-configure-kubeconfig@v2
         with:
           cluster-name: ${{ env.EKS_CLUSTER }}
           aws-region: ${{ env.AWS_REGION }}
