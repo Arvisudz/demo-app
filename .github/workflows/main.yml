@@ -7,7 +7,6 @@ on:
       - main
   workflow_dispatch:
 
-# REQUIRed FOR OIDC: This grants permission for the workflow to fetch the OIDC token
 permissions:
   id-token: write # Request the OIDC JWT token
   contents: read  # Allow checkout of code
@@ -19,7 +18,7 @@ env:
   ECR_REPOSITORY: arrepocicd
   EKS_CLUSTER: ar_cluster
   
-  # Derived values
+  # FIX: Defined as a single string literal
   ECR_REGISTRY: 457271242919.dkr.ecr.ap-south-1.amazonaws.com 
   IMAGE_TAG: ${{ github.sha }} # Use the commit SHA as a unique tag
 
@@ -34,12 +33,10 @@ jobs:
       - name: 2. Configure AWS Credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Assumes the IAM Role defined in GitHub Secrets (no access key needed!)
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 3. Login to Amazon ECR
-        # The ECR login now works because the previous step granted temporary credentials
         uses: aws-actions/amazon-ecr-login@v2
         id: login-ecr
 
@@ -54,20 +51,24 @@ jobs:
           docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
       
-      # --- EKS Deployment ---
-      - name: 6. Update Kubeconfig for EKS
-        # The temporary credentials from OIDC are used to configure kubectl
-        uses: aws-actions/amazon-eks-configure-kubeconfig@v2
-        with:
-          cluster-name: ${{ env.EKS_CLUSTER }}
-          aws-region: ${{ env.AWS_REGION }}
+      # 🟢 NEW STEP: Install kubectl 
+      - name: 6. Install Kubectl (Prerequisite for EKS Deploy)
+        uses: azure/setup-kubectl@v3 
 
-      - name: 7. Deploy to EKS
+      # 🟢 FIXED STEP: Configure Kubeconfig using AWS CLI directly
+      - name: 7. Configure Kubeconfig for EKS
+        # The 'aws' command is available because of Step 2's credential setup.
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ env.EKS_CLUSTER }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: 8. Deploy to EKS (kubectl apply)
         run: |
           K8S_FILE="k8s/deployment.yaml"
           FULL_ECR_URI="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
           
-          # Use sed to replace the placeholder values
+          # Replace the placeholder values in k8s/deployment.yaml
           sed "s|<ECR_REPOSITORY_URI>|${FULL_ECR_URI}|g" $K8S_FILE | \
           sed "s|<IMAGE_TAG>|${{ env.IMAGE_TAG }}|g" - > updated_deployment.yaml
           
@@ -76,3 +77,6 @@ jobs:
           
           # Wait for the deployment to finish rolling out
           kubectl rollout status deployment/nodejs-app-deployment --timeout=5m
+
+
+By using the official AWS CLI command (`aws eks update-kubeconfig`) instead of relying on a dedicated third-party action, you eliminate that repository resolution error. Commit this updated workflow, and your deployment should now proceed to the EKS configuration and deployment steps.
