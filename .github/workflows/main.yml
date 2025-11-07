@@ -6,14 +6,19 @@ on:
   push:
     branches:
       - main
-  # Optional: Allows manual triggering from the GitHub UI
+  # Allows manual triggering from the GitHub UI
   workflow_dispatch:
 
 # Define environment variables used throughout the workflow
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: nodejs-app-repo # Replace with your ECR repository name
-  EKS_CLUSTER: ${{ secrets.EKS_CLUSTER_NAME }}
+  # Hardcoded values provided by the user
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: 457271242919
+  ECR_REPOSITORY: arrepocicd
+  EKS_CLUSTER: ar_cluster
+  
+  # Derived values
+  ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
   IMAGE_TAG: ${{ github.sha }} # Use the commit SHA as a unique tag
 
 jobs:
@@ -34,39 +39,42 @@ jobs:
       - name: 3. Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
 
       # --- Docker Build and Push ---
       - name: 4. Build and Tag Docker Image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          # Builds the image using the ECR registry URI and the Git SHA tag
+          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
+          # Tags the same image as 'latest'
+          docker tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: 5. Push Docker Image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
       
       # --- EKS Deployment ---
       - name: 6. Update Kubeconfig for EKS
         uses: aws-actions/amazon-eks-configure-kubeconfig@v3
         with:
+          # Uses the hardcoded cluster name and region
           cluster-name: ${{ env.EKS_CLUSTER }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 7. Deploy to EKS
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          # Use sed to replace the placeholder in the deployment file with the actual ECR URI and tag
-          sed -i "s|<ECR_REPOSITORY_URI>|${ECR_REGISTRY}/${ECR_REPOSITORY}|g" k8s/deployment.yaml
-          sed -i "s|<IMAGE_TAG>|${IMAGE_TAG}|g" k8s/deployment.yaml
+          # Path to your Kubernetes deployment file
+          K8S_FILE="k8s/deployment.yaml"
+          
+          # Replace the placeholder values in the deployment file with the actual ECR URI and tag
+          # This creates a temporary, updated file for deployment
+          sed "s|<ECR_REPOSITORY_URI>|${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}|g" $K8S_FILE | \
+          sed "s|<IMAGE_TAG>|${{ env.IMAGE_TAG }}|g" - > updated_deployment.yaml
           
           # Apply the updated Kubernetes manifest
-          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f updated_deployment.yaml
           
-          # Optional: Wait for the deployment to finish rolling out
+          # Wait for the deployment to finish rolling out (Optional, but recommended)
           kubectl rollout status deployment/nodejs-app-deployment --timeout=5m
