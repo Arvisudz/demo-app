@@ -7,7 +7,7 @@ on:
       - main
   workflow_dispatch:
 
-# REQUIRED FOR OIDC: This grants permission for the workflow to fetch the OIDC token
+# REQUIRed FOR OIDC: This grants permission for the workflow to fetch the OIDC token
 permissions:
   id-token: write # Request the OIDC JWT token
   contents: read  # Allow checkout of code
