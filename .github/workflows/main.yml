@@ -1,15 +1,17 @@
 # .github/workflows/main.yml
-name: Node.js ECR/EKS Deployment
+name: Node.js ECR/EKS Deployment (OIDC)
 
-# Trigger the workflow on pushes to the 'main' branch
 on:
   push:
     branches:
       - main
-  # Allows manual triggering from the GitHub UI
   workflow_dispatch:
 
-# Define environment variables used throughout the workflow
+# REQUIRED FOR OIDC: This grants permission for the workflow to fetch the OIDC token
+permissions:
+  id-token: write # Request the OIDC JWT token
+  contents: read  # Allow checkout of code
+
 env:
   # Hardcoded values provided by the user
   AWS_REGION: ap-south-1
@@ -28,26 +30,23 @@ jobs:
       - name: 1. Checkout Code
         uses: actions/checkout@v4
 
-      # --- AWS/ECR Authentication ---
-      - name: 2. Configure AWS Credentials
+      # --- AWS/ECR Authentication (OIDC) ---
+      - name: 2. Configure AWS Credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # Assumes the IAM Role defined in GitHub Secrets (no access key needed!)
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 3. Login to Amazon ECR
-        id: login-ecr
+        # The ECR login now works because the previous step granted temporary credentials
         uses: aws-actions/amazon-ecr-login@v2
-        with:
-          registry-type: public
+        id: login-ecr
 
       # --- Docker Build and Push ---
       - name: 4. Build and Tag Docker Image
         run: |
-          # Builds the image using the ECR registry URI and the Git SHA tag
           docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
-          # Tags the same image as 'latest'
           docker tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: 5. Push Docker Image to ECR
@@ -57,24 +56,23 @@ jobs:
       
       # --- EKS Deployment ---
       - name: 6. Update Kubeconfig for EKS
+        # The temporary credentials from OIDC are used to configure kubectl
         uses: aws-actions/amazon-eks-configure-kubeconfig@v3
         with:
-          # Uses the hardcoded cluster name and region
           cluster-name: ${{ env.EKS_CLUSTER }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: 7. Deploy to EKS
         run: |
-          # Path to your Kubernetes deployment file
           K8S_FILE="k8s/deployment.yaml"
+          FULL_ECR_URI="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
           
-          # Replace the placeholder values in the deployment file with the actual ECR URI and tag
-          # This creates a temporary, updated file for deployment
-          sed "s|<ECR_REPOSITORY_URI>|${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}|g" $K8S_FILE | \
+          # Use sed to replace the placeholder values
+          sed "s|<ECR_REPOSITORY_URI>|${FULL_ECR_URI}|g" $K8S_FILE | \
           sed "s|<IMAGE_TAG>|${{ env.IMAGE_TAG }}|g" - > updated_deployment.yaml
           
           # Apply the updated Kubernetes manifest
           kubectl apply -f updated_deployment.yaml
           
-          # Wait for the deployment to finish rolling out (Optional, but recommended)
+          # Wait for the deployment to finish rolling out
           kubectl rollout status deployment/nodejs-app-deployment --timeout=5m
