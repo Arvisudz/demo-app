@@ -18,7 +18,7 @@ env:
   ECR_REPOSITORY: arrepocicd
   EKS_CLUSTER: ar_cluster
   
-  # FIX: Defined as a single string literal
+  # FIx: Defined as a single string literal
   ECR_REGISTRY: 457271242919.dkr.ecr.ap-south-1.amazonaws.com 
   IMAGE_TAG: ${{ github.sha }} # Use the commit SHA as a unique tag
 
