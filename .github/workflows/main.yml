@@ -20,7 +20,7 @@ env:
   EKS_CLUSTER: ar_cluster
   
   # Derived values
-  ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+  ECR_REGISTRY: 457271242919.dkr.ecr.ap-south-1.amazonaws.com 
   IMAGE_TAG: ${{ github.sha }} # Use the commit SHA as a unique tag
 
 jobs:
