@@ -52,11 +52,13 @@ jobs:
           docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
       
       # --- EKS Deployment ---
-      # FIXED: Updated action version from v1 to v4 to resolve the "repository not found" error.
+      # FIX: Using azure/setup-kubectl (a generic tool installer) to install kubectl
       - name: 6. Install Kubectl (Prerequisite for EKS Deploy)
-        uses: aws-actions/setup-kubectl@v4 
+        uses: azure/setup-kubectl@v4 
+        with:
+          version: 'v1.28.0' # Specify a recent stable version to ensure compatibility
 
-      # This step is correct and robust for configuring EKS access
+      # This step is correct and handles EKS authentication via the AWS CLI
       - name: 7. Configure Kubeconfig for EKS
         run: |
           aws eks update-kubeconfig \
