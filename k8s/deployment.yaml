@@ -1,0 +1,41 @@
+# This file defines the Kubernetes Deployment and Service for the Node.js application.
+# The placeholders will be replaced by the GitHub Actions workflow in Step 8.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-app-deployment
+  labels:
+    app: nodejs-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nodejs-app
+  template:
+    metadata:
+      labels:
+        app: nodejs-app
+    spec:
+      containers:
+      - name: nodejs-app-container
+        # Placeholder for ECR image URI and Repository name
+        image: <ECR_REPOSITORY_URI>:<IMAGE_TAG> 
+        ports:
+        - containerPort: 8080 # Assuming your Node.js app runs on port 8080
+        imagePullPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-app-service
+spec:
+  # Use LoadBalancer to expose the service publicly via an AWS Load Balancer
+  type: LoadBalancer 
+  selector:
+    app: nodejs-app
+  ports:
+    # Service port (external access) maps to the container port (internal)
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
