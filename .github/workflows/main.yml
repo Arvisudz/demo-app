@@ -16,7 +16,7 @@ env:
   ECR_REPOSITORY: arrepocicd
   EKS_CLUSTER: ar_cluster
   
-  # Ensure the registry URL is correctly constructed
+  # Ensure The registry URL is correctly constructed
   ECR_REGISTRY: 457271242919.dkr.ecr.ap-south-1.amazonaws.com 
   IMAGE_TAG: ${{ github.sha }}
 
