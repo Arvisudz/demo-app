@@ -13,7 +13,7 @@ permissions:
 env:
   AWS_REGION: ap-south-1
   AWS_ACCOUNT_ID: 457271242919
-  ECR_REPOSITORY: arrepocicd
+  ECR_REPOSITORY: 457271242919.dkr.ecr.eu-north-1.amazonaws.com/arrepocicd
   EKS_CLUSTER: ar_clusterm
   
   # Ensure The registry URL is correctly constructed
